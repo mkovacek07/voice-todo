@@ -10,12 +10,16 @@ interface UndoSnackbarProps {
   visible: boolean;
   message: string;
   onUndo: () => void;
+  bottom?: number; // distance from the bottom (accounts for safe area)
+  edge?: number; // horizontal gutter (keeps it aligned with content)
 }
 
 export default function UndoSnackbar({
   visible,
   message,
   onUndo,
+  bottom = 150,
+  edge = 16,
 }: UndoSnackbarProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -23,7 +27,10 @@ export default function UndoSnackbar({
   if (!visible) return null;
 
   return (
-    <View style={styles.container} pointerEvents="box-none">
+    <View
+      style={[styles.container, { bottom, left: edge, right: edge }]}
+      pointerEvents="box-none"
+    >
       <View style={styles.bar}>
         <Text style={styles.message} numberOfLines={1}>
           {message}
@@ -40,9 +47,6 @@ const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     container: {
       position: "absolute",
-      left: 16,
-      right: 16,
-      bottom: 150,
       alignItems: "center",
     },
     bar: {

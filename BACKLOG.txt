@@ -28,6 +28,13 @@ PLANNED FEATURES
     See src/components/UndoSnackbar.tsx and App.tsx.
 
 
+[FEATURE] (done) Group / filter todos by date
+    List is grouped into sections (Overdue, Today, Tomorrow, then each
+    future date) with a filter bar (All / Overdue / Today / Upcoming,
+    each showing a count). See src/grouping.ts and App.tsx.
+    Note: distinct from named "Shopping"-style groups above.
+
+
 BUGS
 ----
 

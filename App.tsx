@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
-  type ListRenderItem,
-  SafeAreaView,
+  SectionList,
+  type SectionListRenderItem,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import FilterPicker from "./src/components/FilterPicker";
 import LanguagePicker from "./src/components/LanguagePicker";
 import TodoEditModal, {
   type TodoDraft,
@@ -20,6 +25,14 @@ import {
   DEFAULT_SPEECH_LANG,
   SPEECH_LANGUAGES,
 } from "./src/config";
+import { todayISO } from "./src/dateUtils";
+import {
+  type DateFilter,
+  FILTERS,
+  filterCounts,
+  groupTodos,
+  type TodoSection,
+} from "./src/grouping";
 import { parseTranscript } from "./src/parser";
 import { loadLang, loadTodos, saveLang, saveTodos } from "./src/storage";
 import { ThemeProvider, useTheme } from "./src/ThemeContext";
@@ -43,17 +56,27 @@ interface PendingDelete {
   entries: DeletedEntry[];
 }
 
+// Content is capped to this width and centered on large screens (tablets,
+// landscape) so rows don't stretch uncomfortably wide.
+const CONTENT_MAX_WIDTH = 640;
+
 export default function App() {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
 
 function AppContent() {
   const { colors, mode, toggle } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  // Horizontal gutter that keeps overlays aligned with the centered content.
+  const edgePad = Math.max(16, (width - CONTENT_MAX_WIDTH) / 2);
 
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -62,6 +85,7 @@ function AppContent() {
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [lang, setLang] = useState<string>(DEFAULT_SPEECH_LANG);
+  const [filter, setFilter] = useState<DateFilter>("all");
 
   // Always-current view of todos, so deleteTodo can read positions without
   // becoming dependent on (and re-created by) every todos change.
@@ -234,7 +258,14 @@ function AppContent() {
 
   const allDone = todos.length > 0 && remaining === 0;
 
-  const renderItem: ListRenderItem<Todo> = useCallback(
+  const today = todayISO();
+  const sections = useMemo(
+    () => groupTodos(todos, filter, today),
+    [todos, filter, today]
+  );
+  const counts = useMemo(() => filterCounts(todos, today), [todos, today]);
+
+  const renderItem: SectionListRenderItem<Todo, TodoSection> = useCallback(
     ({ item }) => (
       <TodoItem
         todo={item}
@@ -247,9 +278,19 @@ function AppContent() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
+      ]}
+    >
       <StatusBar barStyle={mode === "dark" ? "light-content" : "dark-content"} />
 
+      <View style={styles.content}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Voice Todo</Text>
@@ -272,6 +313,7 @@ function AppContent() {
             {mode === "dark" ? "☀️" : "🌙"}
           </Text>
         </TouchableOpacity>
+        <FilterPicker value={filter} counts={counts} onSelect={setFilter} />
         <TouchableOpacity style={styles.addButton} onPress={openAdd}>
           <Text style={styles.addButtonText}>＋</Text>
         </TouchableOpacity>
@@ -300,13 +342,24 @@ function AppContent() {
         </View>
       )}
 
-      <FlatList
-        data={todos}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        renderSectionHeader={({ section }) => (
+          <Text
+            style={[
+              styles.sectionHeader,
+              section.overdue && styles.sectionHeaderOverdue,
+            ]}
+          >
+            {section.title}  ·  {section.data.length}
+          </Text>
+        )}
+        stickySectionHeadersEnabled={false}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 150 }]}
         ListEmptyComponent={
-          loaded ? (
+          !loaded ? null : todos.length === 0 ? (
             <View style={styles.empty}>
               <Text style={styles.emptyEmoji}>🎤</Text>
               <Text style={styles.emptyTitle}>No todos yet</Text>
@@ -315,12 +368,27 @@ function AppContent() {
                 “Buy milk tomorrow and call mom on Friday”.
               </Text>
             </View>
-          ) : null
+          ) : (
+            <View style={styles.empty}>
+              <Text style={styles.emptyEmoji}>🗂️</Text>
+              <Text style={styles.emptyTitle}>Nothing here</Text>
+              <Text style={styles.emptyText}>
+                No todos match the “{FILTERS.find((f) => f.key === filter)?.label}”
+                filter.
+              </Text>
+            </View>
+          )
         }
       />
+      </View>
 
       {(isListening || processing || error) && (
-        <View style={styles.statusBar}>
+        <View
+          style={[
+            styles.statusBar,
+            { bottom: insets.bottom + 132, left: edgePad, right: edgePad },
+          ]}
+        >
           {processing ? (
             <View style={styles.statusRow}>
               <ActivityIndicator color={colors.accent} />
@@ -344,9 +412,11 @@ function AppContent() {
             : "Todo deleted"
         }
         onUndo={undoDelete}
+        bottom={insets.bottom + 132}
+        edge={edgePad}
       />
 
-      <View style={styles.micWrap}>
+      <View style={[styles.micWrap, { bottom: insets.bottom + 24 }]}>
         <TouchableOpacity
           style={[styles.mic, isListening && styles.micActive]}
           onPress={isListening ? stop : start}
@@ -369,7 +439,7 @@ function AppContent() {
           setEditingTodo(null);
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -378,6 +448,12 @@ const createStyles = (colors: ThemeColors) =>
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  content: {
+    flex: 1,
+    width: "100%",
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: "center",
   },
   header: {
     flexDirection: "row",
@@ -425,6 +501,20 @@ const createStyles = (colors: ThemeColors) =>
     color: colors.accent,
     fontWeight: "700",
     lineHeight: 30,
+  },
+  sectionHeader: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.textSecondary,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    backgroundColor: colors.background,
+    paddingTop: 14,
+    paddingBottom: 6,
+    paddingHorizontal: 4,
+  },
+  sectionHeaderOverdue: {
+    color: colors.danger,
   },
   actionsBar: {
     flexDirection: "row",

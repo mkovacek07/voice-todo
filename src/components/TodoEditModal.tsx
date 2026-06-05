@@ -140,6 +140,9 @@ const createStyles = (colors: ThemeColors) =>
     paddingHorizontal: 24,
   },
   card: {
+    width: "100%",
+    maxWidth: 440,
+    alignSelf: "center",
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
