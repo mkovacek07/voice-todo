@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "voice-todo",
+    "slug": "voice-todo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Allow Voice Todo to recognize your speech so it can turn it into todos.",
+        "NSMicrophoneUsageDescription": "Allow Voice Todo to use the microphone so you can dictate your todos."
+      },
+      "bundleIdentifier": "com.dramko12.voice-todo"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow Voice Todo to use the microphone so you can dictate your todos.",
+          "speechRecognitionPermission": "Allow Voice Todo to recognize your speech so it can turn it into todos.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ]
+  }
+}

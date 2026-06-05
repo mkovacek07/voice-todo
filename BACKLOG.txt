@@ -1,0 +1,34 @@
+VOICE TODO — FEATURE & BUG BACKLOG
+==================================
+
+How to use this file:
+- Add one entry per feature or bug.
+- Prefix each with a tag: [FEATURE] or [BUG].
+- Optionally add a status: (todo) / (in progress) / (done).
+- Keep newest ideas at the top.
+
+
+PLANNED FEATURES
+----------------
+
+[FEATURE] (todo) Share checklist
+    Let the user share a checklist with others (e.g. via the native share
+    sheet, a link, or export). Should include the todo text, dates, and
+    checked state.
+
+[FEATURE] (todo) Checklist groups
+    Support grouping todos into named checklists (e.g. "Shopping", "Work",
+    "Trip"). Each group has its own list of items. User can create, rename,
+    and delete groups, and add todos to a specific group.
+
+[FEATURE] (done) Restore deleted todo (undo)
+    When the user deletes a todo, give them the option to restore it.
+    Implemented as an "Undo" snackbar shown for ~4.5s after deletion;
+    tapping UNDO restores the todo to its original position.
+    See src/components/UndoSnackbar.tsx and App.tsx.
+
+
+BUGS
+----
+
+(none reported yet)
