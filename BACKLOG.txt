@@ -23,6 +23,7 @@ PLANNED FEATURES
     After user creates a todo, he can edit it and create a list inside that todo. 
     For example: Todo for Shoping then inside that todo he can add a list of items to buy like milk, egs, etc...
     SHould the user add it manually or can it be done over voice?
+    If you check the parent todo, everything inside should be checkd
 
 [FEATURE] (todo) Assing a todo to some person.
     User should be able to assing a Todo to some person. 
