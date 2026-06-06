@@ -16,10 +16,17 @@ PLANNED FEATURES
     sheet, a link, or export). Should include the todo text, dates, and
     checked state.
 
-[FEATURE] (todo) Checklist groups
+[FEATURE] (todo) Checklist groups (todo inside todo list)
     Support grouping todos into named checklists (e.g. "Shopping", "Work",
     "Trip"). Each group has its own list of items. User can create, rename,
     and delete groups, and add todos to a specific group.
+    After user creates a todo, he can edit it and create a list inside that todo. 
+    For example: Todo for Shoping then inside that todo he can add a list of items to buy like milk, egs, etc...
+    SHould the user add it manually or can it be done over voice?
+
+[FEATURE] (todo) Assing a todo to some person.
+    User should be able to assing a Todo to some person. 
+    For example: Get cups -> Marko, Buy bread -> Pave
 
 [FEATURE] (done) Restore deleted todo (undo)
     When the user deletes a todo, give them the option to restore it.
