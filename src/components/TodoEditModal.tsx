@@ -6,8 +6,12 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -43,6 +47,7 @@ export default function TodoEditModal({
   const [text, setText] = useState("");
   const [date, setDate] = useState(todayISO());
   const [showPicker, setShowPicker] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   // Reset fields whenever the modal opens for a (possibly different) todo.
   useEffect(() => {
@@ -53,12 +58,40 @@ export default function TodoEditModal({
     }
   }, [visible, todo]);
 
+  // Track keyboard visibility so an outside tap can dismiss it first.
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", () =>
+      setKeyboardVisible(true)
+    );
+    const hide = Keyboard.addListener("keyboardDidHide", () =>
+      setKeyboardVisible(false)
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
   const isEditing = Boolean(todo);
 
   const handleSave = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
+    Keyboard.dismiss();
     onSave({ text: trimmed, date });
+  };
+
+  // Opening the date picker should release focus from the text field so the
+  // keyboard gets out of the way.
+  const togglePicker = () => {
+    Keyboard.dismiss();
+    setShowPicker((s) => !s);
+  };
+
+  // Tap outside the card: dismiss the keyboard if it's up, otherwise cancel.
+  const handleBackdropPress = () => {
+    if (keyboardVisible) Keyboard.dismiss();
+    else onCancel();
   };
 
   const onPickerChange = (event: DateTimePickerEvent, selected?: Date) => {
@@ -75,41 +108,52 @@ export default function TodoEditModal({
       animationType="fade"
       onRequestClose={onCancel}
     >
-      <View style={styles.backdrop}>
+      <KeyboardAvoidingView
+        style={styles.backdrop}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        {/* Tap outside the card to dismiss the keyboard / close. */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleBackdropPress} />
+
         <View style={styles.card}>
-          <Text style={styles.title}>
-            {isEditing ? "Edit todo" : "New todo"}
-          </Text>
-
-          <Text style={styles.label}>Task</Text>
-          <TextInput
-            style={styles.input}
-            value={text}
-            onChangeText={setText}
-            placeholder="What needs doing?"
-            placeholderTextColor={colors.textMuted}
-            multiline
-            autoFocus
-          />
-
-          <Text style={styles.label}>Date</Text>
-          <TouchableOpacity
-            style={styles.dateButton}
-            onPress={() => setShowPicker((s) => !s)}
+          <ScrollView
+            style={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.dateButtonText}>{formatDateLabel(date)}</Text>
-          </TouchableOpacity>
+            <Text style={styles.title}>
+              {isEditing ? "Edit todo" : "New todo"}
+            </Text>
 
-          {showPicker && (
-            <DateTimePicker
-              value={fromISODate(date)}
-              mode="date"
-              display={Platform.OS === "ios" ? "inline" : "default"}
-              themeVariant={mode}
-              accentColor={colors.accent}
-              onChange={onPickerChange}
+            <Text style={styles.label}>Task</Text>
+            <TextInput
+              style={styles.input}
+              value={text}
+              onChangeText={setText}
+              placeholder="What needs doing?"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleSave}
             />
-          )}
+
+            <Text style={styles.label}>Date</Text>
+            <TouchableOpacity style={styles.dateButton} onPress={togglePicker}>
+              <Text style={styles.dateButtonText}>{formatDateLabel(date)}</Text>
+            </TouchableOpacity>
+
+            {showPicker && (
+              <DateTimePicker
+                value={fromISODate(date)}
+                mode="date"
+                display={Platform.OS === "ios" ? "inline" : "default"}
+                themeVariant={mode}
+                accentColor={colors.accent}
+                onChange={onPickerChange}
+              />
+            )}
+          </ScrollView>
 
           <View style={styles.actions}>
             <TouchableOpacity
@@ -126,7 +170,7 @@ export default function TodoEditModal({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -142,12 +186,17 @@ const createStyles = (colors: ThemeColors) =>
   card: {
     width: "100%",
     maxWidth: 440,
+    maxHeight: "88%",
     alignSelf: "center",
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 20,
     padding: 22,
+  },
+  scroll: {
+    flexGrow: 0,
+    flexShrink: 1,
   },
   title: {
     fontSize: 20,
