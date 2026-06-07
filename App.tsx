@@ -26,6 +26,7 @@ import {
   SPEECH_LANGUAGES,
 } from "./src/config";
 import { todayISO } from "./src/dateUtils";
+import { newId } from "./src/id";
 import {
   type DateFilter,
   FILTERS,
@@ -39,9 +40,6 @@ import { ThemeProvider, useTheme } from "./src/ThemeContext";
 import type { ThemeColors } from "./src/theme";
 import type { ParsedTodo, Todo } from "./src/types";
 import { useVoice } from "./src/useVoice";
-
-const newId = (): string =>
-  `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
 // How long the "Undo" snackbar stays before the deletion becomes permanent.
 const UNDO_TIMEOUT_MS = 4500;
@@ -151,15 +149,42 @@ function AppContent() {
 
   const toggleTodo = useCallback((id: string) => {
     setTodos((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
+      prev.map((t) => {
+        if (t.id !== id) return t;
+        const next = !t.done;
+        // Checking/unchecking a parent cascades to all its sub-tasks.
+        return {
+          ...t,
+          done: next,
+          subtasks: t.subtasks?.map((s) => ({ ...s, done: next })),
+        };
+      })
     );
   }, []);
 
-  // Mark every todo done, or clear them all if they're already all done.
+  // Toggle a single sub-task; the parent becomes done only when all are done.
+  const toggleSubtask = useCallback((todoId: string, subId: string) => {
+    setTodos((prev) =>
+      prev.map((t) => {
+        if (t.id !== todoId || !t.subtasks) return t;
+        const subtasks = t.subtasks.map((s) =>
+          s.id === subId ? { ...s, done: !s.done } : s
+        );
+        return { ...t, subtasks, done: subtasks.every((s) => s.done) };
+      })
+    );
+  }, []);
+
+  // Mark every todo (and its sub-tasks) done, or clear them all if all done.
   const toggleAll = useCallback(() => {
     setTodos((prev) => {
       const everyDone = prev.length > 0 && prev.every((t) => t.done);
-      return prev.map((t) => ({ ...t, done: !everyDone }));
+      const next = !everyDone;
+      return prev.map((t) => ({
+        ...t,
+        done: next,
+        subtasks: t.subtasks?.map((s) => ({ ...s, done: next })),
+      }));
     });
   }, []);
 
@@ -232,16 +257,22 @@ function AppContent() {
   }, []);
 
   const handleSaveModal = useCallback(
-    ({ text, date }: TodoDraft) => {
+    ({ text, date, subtasks }: TodoDraft) => {
+      // With sub-tasks present, the parent's done state follows them.
+      const derivedDone = (fallback: boolean) =>
+        subtasks.length > 0 ? subtasks.every((s) => s.done) : fallback;
+
       if (editingTodo) {
         setTodos((prev) =>
           prev.map((t) =>
-            t.id === editingTodo.id ? { ...t, text, date } : t
+            t.id === editingTodo.id
+              ? { ...t, text, date, subtasks, done: derivedDone(t.done) }
+              : t
           )
         );
       } else {
         setTodos((prev) => [
-          { id: newId(), text, date, done: false },
+          { id: newId(), text, date, done: derivedDone(false), subtasks },
           ...prev,
         ]);
       }
@@ -270,11 +301,12 @@ function AppContent() {
       <TodoItem
         todo={item}
         onToggle={toggleTodo}
+        onToggleSubtask={toggleSubtask}
         onEdit={openEdit}
         onDelete={deleteTodo}
       />
     ),
-    [toggleTodo, openEdit, deleteTodo]
+    [toggleTodo, toggleSubtask, openEdit, deleteTodo]
   );
 
   return (

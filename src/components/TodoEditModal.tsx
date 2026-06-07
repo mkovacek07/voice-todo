@@ -19,13 +19,15 @@ import {
   View,
 } from "react-native";
 import { formatDateLabel, fromISODate, toISODate, todayISO } from "../dateUtils";
+import { newId } from "../id";
 import { useTheme } from "../ThemeContext";
 import type { ThemeColors } from "../theme";
-import type { Todo } from "../types";
+import type { SubTask, Todo } from "../types";
 
 export interface TodoDraft {
   text: string;
   date: string;
+  subtasks: SubTask[];
 }
 
 interface TodoEditModalProps {
@@ -48,6 +50,7 @@ export default function TodoEditModal({
   const [date, setDate] = useState(todayISO());
   const [showPicker, setShowPicker] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [subtasks, setSubtasks] = useState<SubTask[]>([]);
 
   // Reset fields whenever the modal opens for a (possibly different) todo.
   useEffect(() => {
@@ -55,6 +58,7 @@ export default function TodoEditModal({
       setText(todo?.text ?? "");
       setDate(todo?.date ?? todayISO());
       setShowPicker(false);
+      setSubtasks(todo?.subtasks ? todo.subtasks.map((s) => ({ ...s })) : []);
     }
   }, [visible, todo]);
 
@@ -78,8 +82,22 @@ export default function TodoEditModal({
     const trimmed = text.trim();
     if (!trimmed) return;
     Keyboard.dismiss();
-    onSave({ text: trimmed, date });
+    const cleanedSubtasks = subtasks
+      .map((s) => ({ ...s, text: s.text.trim() }))
+      .filter((s) => s.text.length > 0);
+    onSave({ text: trimmed, date, subtasks: cleanedSubtasks });
   };
+
+  const addSubtask = () =>
+    setSubtasks((prev) => [...prev, { id: newId(), text: "", done: false }]);
+
+  const updateSubtask = (id: string, value: string) =>
+    setSubtasks((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, text: value } : s))
+    );
+
+  const removeSubtask = (id: string) =>
+    setSubtasks((prev) => prev.filter((s) => s.id !== id));
 
   // Opening the date picker should release focus from the text field so the
   // keyboard gets out of the way.
@@ -119,7 +137,9 @@ export default function TodoEditModal({
           <ScrollView
             style={styles.scroll}
             keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator
+            persistentScrollbar
+            indicatorStyle={mode === "dark" ? "white" : "black"}
           >
             <Text style={styles.title}>
               {isEditing ? "Edit todo" : "New todo"}
@@ -153,6 +173,31 @@ export default function TodoEditModal({
                 onChange={onPickerChange}
               />
             )}
+
+            <Text style={styles.label}>Checklist items</Text>
+            {subtasks.map((s, i) => (
+              <View key={s.id} style={styles.subRow}>
+                <TextInput
+                  style={[styles.input, styles.subInput]}
+                  value={s.text}
+                  onChangeText={(v) => updateSubtask(s.id, v)}
+                  placeholder={`Item ${i + 1}`}
+                  placeholderTextColor={colors.textMuted}
+                  returnKeyType="done"
+                />
+                <TouchableOpacity
+                  style={styles.subRemove}
+                  onPress={() => removeSubtask(s.id)}
+                  hitSlop={8}
+                  accessibilityLabel="Remove item"
+                >
+                  <Text style={styles.subRemoveText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            <TouchableOpacity style={styles.addItemBtn} onPress={addSubtask}>
+              <Text style={styles.addItemText}>＋ Add item</Text>
+            </TouchableOpacity>
           </ScrollView>
 
           <View style={styles.actions}>
@@ -222,6 +267,36 @@ const createStyles = (colors: ThemeColors) =>
     backgroundColor: colors.surfaceAlt,
     minHeight: 48,
     textAlignVertical: "top",
+  },
+  subRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  subInput: {
+    flex: 1,
+    minHeight: 44,
+  },
+  subRemove: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginLeft: 6,
+  },
+  subRemoveText: {
+    fontSize: 16,
+    color: colors.textMuted,
+    fontWeight: "700",
+  },
+  addItemBtn: {
+    alignSelf: "flex-start",
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginTop: 2,
+  },
+  addItemText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.accent,
   },
   dateButton: {
     borderWidth: 1,

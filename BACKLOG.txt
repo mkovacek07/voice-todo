@@ -16,14 +16,17 @@ PLANNED FEATURES
     sheet, a link, or export). Should include the todo text, dates, and
     checked state.
 
-[FEATURE] (todo) Checklist groups (todo inside todo list)
-    Support grouping todos into named checklists (e.g. "Shopping", "Work",
-    "Trip"). Each group has its own list of items. User can create, rename,
-    and delete groups, and add todos to a specific group.
-    After user creates a todo, he can edit it and create a list inside that todo. 
-    For example: Todo for Shoping then inside that todo he can add a list of items to buy like milk, egs, etc...
-    SHould the user add it manually or can it be done over voice?
-    If you check the parent todo, everything inside should be checkd
+[FEATURE] (done) Checklist groups (todo inside todo list)
+    A todo can contain a checklist of sub-tasks (e.g. "Shopping" -> milk,
+    eggs). Edit a todo and use "Checklist items" to add/rename/remove items.
+    The list shows a progress count (e.g. ✓ 2/5) and an expand arrow to
+    reveal items; each item has its own checkbox. Checking the parent checks
+    all items; the parent auto-checks when all items are done (and shows a
+    dash when partially done).
+    Implementation: SubTask type on Todo; see src/components/TodoEditModal.tsx
+    (editor), src/components/TodoItem.tsx (display), App.tsx (toggle logic).
+    DECISION: items are added MANUALLY for now (voice still creates top-level
+    todos). Voice-to-subitems could be a follow-up.
 
 [FEATURE] (todo) Assing a todo to some person.
     User should be able to assing a Todo to some person. 
