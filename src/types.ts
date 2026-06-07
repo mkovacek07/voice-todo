@@ -15,6 +15,10 @@ export interface Todo {
   date: string;
   done: boolean;
   subtasks?: SubTask[];
+  // Reminder time "HH:MM" (24h) on the todo's date; undefined = no reminder.
+  reminderTime?: string;
+  // Id of the scheduled local notification (so it can be cancelled).
+  notificationId?: string;
 }
 
 // A parsed-but-not-yet-persisted todo (no id / done state yet).

@@ -46,6 +46,14 @@ PLANNED FEATURES
     Note: distinct from named "Shopping"-style groups above.
 
 
+[FEATURE] (done) Give alert on the day of the todo
+    Per-todo opt-in reminder: in the edit dialog, a "Remind me on this day"
+    switch + a time picker. Schedules a local notification on the todo's
+    date at the chosen time (expo-notifications). A 🔔 HH:MM chip shows on
+    the todo. Reminders are cancelled/rescheduled when the todo is completed,
+    edited, or deleted. See src/notifications.ts, TodoEditModal.tsx, App.tsx.
+    NOTE: requires a native rebuild (expo-notifications is a native module).
+
 BUGS
 ----
 

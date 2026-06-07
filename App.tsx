@@ -27,6 +27,7 @@ import {
 } from "./src/config";
 import { todayISO } from "./src/dateUtils";
 import { newId } from "./src/id";
+import { cancelReminder, scheduleTodoReminder } from "./src/notifications";
 import {
   type DateFilter,
   FILTERS,
@@ -90,6 +91,10 @@ function AppContent() {
   const todosRef = useRef<Todo[]>(todos);
   todosRef.current = todos;
 
+  // Mirror of pendingDelete so scheduleUndo can cancel a superseded one.
+  const pendingDeleteRef = useRef<PendingDelete | null>(pendingDelete);
+  pendingDeleteRef.current = pendingDelete;
+
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load persisted todos on mount.
@@ -147,46 +152,85 @@ function AppContent() {
     lang,
   });
 
-  const toggleTodo = useCallback((id: string) => {
-    setTodos((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        const next = !t.done;
-        // Checking/unchecking a parent cascades to all its sub-tasks.
-        return {
-          ...t,
-          done: next,
-          subtasks: t.subtasks?.map((s) => ({ ...s, done: next })),
-        };
-      })
-    );
+  // Keep a todo's scheduled reminder in sync with its done state: cancel it
+  // when completed, (re)schedule it when re-opened. Stores the new id.
+  const syncReminder = useCallback((todo: Todo, nextDone: boolean) => {
+    if (!todo.reminderTime) return;
+    if (nextDone) {
+      cancelReminder(todo.notificationId);
+    } else {
+      scheduleTodoReminder({ ...todo, done: false }).then((nid) => {
+        setTodos((prev) =>
+          prev.map((t) => (t.id === todo.id ? { ...t, notificationId: nid } : t))
+        );
+      });
+    }
   }, []);
 
+  const toggleTodo = useCallback(
+    (id: string) => {
+      const current = todosRef.current.find((t) => t.id === id);
+      if (!current) return;
+      const next = !current.done;
+      setTodos((prev) =>
+        prev.map((t) => {
+          if (t.id !== id) return t;
+          // Checking/unchecking a parent cascades to all its sub-tasks.
+          return {
+            ...t,
+            done: next,
+            subtasks: t.subtasks?.map((s) => ({ ...s, done: next })),
+            notificationId: next ? undefined : t.notificationId,
+          };
+        })
+      );
+      syncReminder(current, next);
+    },
+    [syncReminder]
+  );
+
   // Toggle a single sub-task; the parent becomes done only when all are done.
-  const toggleSubtask = useCallback((todoId: string, subId: string) => {
-    setTodos((prev) =>
-      prev.map((t) => {
-        if (t.id !== todoId || !t.subtasks) return t;
-        const subtasks = t.subtasks.map((s) =>
-          s.id === subId ? { ...s, done: !s.done } : s
-        );
-        return { ...t, subtasks, done: subtasks.every((s) => s.done) };
-      })
-    );
-  }, []);
+  const toggleSubtask = useCallback(
+    (todoId: string, subId: string) => {
+      const current = todosRef.current.find((t) => t.id === todoId);
+      if (!current || !current.subtasks) return;
+      const newSubs = current.subtasks.map((s) =>
+        s.id === subId ? { ...s, done: !s.done } : s
+      );
+      const nextDone = newSubs.every((s) => s.done);
+      const doneChanged = nextDone !== current.done;
+      setTodos((prev) =>
+        prev.map((t) =>
+          t.id === todoId
+            ? {
+                ...t,
+                subtasks: newSubs,
+                done: nextDone,
+                notificationId: nextDone ? undefined : t.notificationId,
+              }
+            : t
+        )
+      );
+      if (doneChanged) syncReminder(current, nextDone);
+    },
+    [syncReminder]
+  );
 
   // Mark every todo (and its sub-tasks) done, or clear them all if all done.
   const toggleAll = useCallback(() => {
-    setTodos((prev) => {
-      const everyDone = prev.length > 0 && prev.every((t) => t.done);
-      const next = !everyDone;
-      return prev.map((t) => ({
+    const list = todosRef.current;
+    const everyDone = list.length > 0 && list.every((t) => t.done);
+    const next = !everyDone;
+    setTodos((prev) =>
+      prev.map((t) => ({
         ...t,
         done: next,
         subtasks: t.subtasks?.map((s) => ({ ...s, done: next })),
-      }));
-    });
-  }, []);
+        notificationId: next ? undefined : t.notificationId,
+      }))
+    );
+    list.forEach((t) => syncReminder(t, next));
+  }, [syncReminder]);
 
   const clearUndoTimer = useCallback(() => {
     if (undoTimer.current) {
@@ -195,13 +239,19 @@ function AppContent() {
     }
   }, []);
 
-  // Stash deleted entries and (re)start the undo window.
+  // Stash deleted entries and (re)start the undo window. Reminders stay
+  // scheduled during the window and are cancelled only once the deletion
+  // becomes permanent (timeout) or is superseded by a newer deletion.
   const scheduleUndo = useCallback(
     (entries: DeletedEntry[]) => {
       if (entries.length === 0) return;
+      pendingDeleteRef.current?.entries.forEach((e) =>
+        cancelReminder(e.todo.notificationId)
+      );
       setPendingDelete({ entries });
       clearUndoTimer();
       undoTimer.current = setTimeout(() => {
+        entries.forEach((e) => cancelReminder(e.todo.notificationId));
         setPendingDelete(null);
         undoTimer.current = null;
       }, UNDO_TIMEOUT_MS);
@@ -257,25 +307,42 @@ function AppContent() {
   }, []);
 
   const handleSaveModal = useCallback(
-    ({ text, date, subtasks }: TodoDraft) => {
+    async ({ text, date, subtasks, reminderTime }: TodoDraft) => {
       // With sub-tasks present, the parent's done state follows them.
       const derivedDone = (fallback: boolean) =>
         subtasks.length > 0 ? subtasks.every((s) => s.done) : fallback;
 
-      if (editingTodo) {
-        setTodos((prev) =>
-          prev.map((t) =>
-            t.id === editingTodo.id
-              ? { ...t, text, date, subtasks, done: derivedDone(t.done) }
-              : t
-          )
-        );
-      } else {
-        setTodos((prev) => [
-          { id: newId(), text, date, done: derivedDone(false), subtasks },
-          ...prev,
-        ]);
-      }
+      const reminder = reminderTime ?? undefined;
+
+      // Replace any previously scheduled reminder for this todo.
+      if (editingTodo) await cancelReminder(editingTodo.notificationId);
+
+      const target: Todo = editingTodo
+        ? {
+            ...editingTodo,
+            text,
+            date,
+            subtasks,
+            done: derivedDone(editingTodo.done),
+            reminderTime: reminder,
+          }
+        : {
+            id: newId(),
+            text,
+            date,
+            done: derivedDone(false),
+            subtasks,
+            reminderTime: reminder,
+          };
+
+      const notificationId = await scheduleTodoReminder(target);
+      const saved: Todo = { ...target, notificationId };
+
+      setTodos((prev) =>
+        editingTodo
+          ? prev.map((t) => (t.id === editingTodo.id ? saved : t))
+          : [saved, ...prev]
+      );
       setModalVisible(false);
       setEditingTodo(null);
     },

@@ -76,6 +76,11 @@ export default function TodoItem({
                 </Text>
               </View>
             )}
+            {todo.reminderTime && (
+              <View style={styles.reminderChip}>
+                <Text style={styles.reminderText}>🔔 {todo.reminderTime}</Text>
+              </View>
+            )}
           </View>
         </TouchableOpacity>
 
@@ -182,8 +187,10 @@ const createStyles = (colors: ThemeColors) =>
     },
     chipRow: {
       flexDirection: "row",
+      flexWrap: "wrap",
       alignItems: "center",
       marginTop: 6,
+      gap: 6,
     },
     dateChip: {
       backgroundColor: colors.accentSurface,
@@ -201,9 +208,19 @@ const createStyles = (colors: ThemeColors) =>
       borderRadius: 8,
       paddingHorizontal: 8,
       paddingVertical: 2,
-      marginLeft: 6,
     },
     progressText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontWeight: "600",
+    },
+    reminderChip: {
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+    },
+    reminderText: {
       fontSize: 12,
       color: colors.textSecondary,
       fontWeight: "600",

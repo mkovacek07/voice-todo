@@ -13,6 +13,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -28,7 +29,10 @@ export interface TodoDraft {
   text: string;
   date: string;
   subtasks: SubTask[];
+  reminderTime: string | null; // "HH:MM" or null for no reminder
 }
+
+const DEFAULT_REMINDER_TIME = "09:00";
 
 interface TodoEditModalProps {
   visible: boolean;
@@ -51,6 +55,9 @@ export default function TodoEditModal({
   const [showPicker, setShowPicker] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [subtasks, setSubtasks] = useState<SubTask[]>([]);
+  const [reminderOn, setReminderOn] = useState(false);
+  const [reminderTime, setReminderTime] = useState(DEFAULT_REMINDER_TIME);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   // Reset fields whenever the modal opens for a (possibly different) todo.
   useEffect(() => {
@@ -59,6 +66,9 @@ export default function TodoEditModal({
       setDate(todo?.date ?? todayISO());
       setShowPicker(false);
       setSubtasks(todo?.subtasks ? todo.subtasks.map((s) => ({ ...s })) : []);
+      setReminderOn(Boolean(todo?.reminderTime));
+      setReminderTime(todo?.reminderTime ?? DEFAULT_REMINDER_TIME);
+      setShowTimePicker(false);
     }
   }, [visible, todo]);
 
@@ -85,7 +95,28 @@ export default function TodoEditModal({
     const cleanedSubtasks = subtasks
       .map((s) => ({ ...s, text: s.text.trim() }))
       .filter((s) => s.text.length > 0);
-    onSave({ text: trimmed, date, subtasks: cleanedSubtasks });
+    onSave({
+      text: trimmed,
+      date,
+      subtasks: cleanedSubtasks,
+      reminderTime: reminderOn ? reminderTime : null,
+    });
+  };
+
+  const onTimeChange = (event: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === "android") setShowTimePicker(false);
+    if (event.type === "dismissed" || !selected) return;
+    const hh = String(selected.getHours()).padStart(2, "0");
+    const mm = String(selected.getMinutes()).padStart(2, "0");
+    setReminderTime(`${hh}:${mm}`);
+  };
+
+  // A Date carrying the chosen reminder time (date part is irrelevant here).
+  const reminderTimeAsDate = () => {
+    const [hh, mm] = reminderTime.split(":").map(Number);
+    const d = new Date();
+    d.setHours(hh || 0, mm || 0, 0, 0);
+    return d;
   };
 
   const addSubtask = () =>
@@ -172,6 +203,44 @@ export default function TodoEditModal({
                 accentColor={colors.accent}
                 onChange={onPickerChange}
               />
+            )}
+
+            <View style={styles.reminderHeader}>
+              <Text style={[styles.label, styles.reminderLabel]}>
+                Remind me on this day
+              </Text>
+              <Switch
+                value={reminderOn}
+                onValueChange={(v) => {
+                  Keyboard.dismiss();
+                  setReminderOn(v);
+                }}
+                trackColor={{ true: colors.accent, false: colors.border }}
+                thumbColor={colors.white}
+              />
+            </View>
+            {reminderOn && (
+              <>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setShowTimePicker((s) => !s);
+                  }}
+                >
+                  <Text style={styles.dateButtonText}>At {reminderTime}</Text>
+                </TouchableOpacity>
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={reminderTimeAsDate()}
+                    mode="time"
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                    themeVariant={mode}
+                    accentColor={colors.accent}
+                    onChange={onTimeChange}
+                  />
+                )}
+              </>
             )}
 
             <Text style={styles.label}>Checklist items</Text>
@@ -267,6 +336,15 @@ const createStyles = (colors: ThemeColors) =>
     backgroundColor: colors.surfaceAlt,
     minHeight: 48,
     textAlignVertical: "top",
+  },
+  reminderHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  reminderLabel: {
+    marginTop: 14,
+    marginBottom: 8,
   },
   subRow: {
     flexDirection: "row",
