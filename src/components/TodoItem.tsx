@@ -82,6 +82,15 @@ export default function TodoItem({
               </View>
             )}
           </View>
+          {(todo.tags?.length ?? 0) > 0 && (
+            <View style={styles.tagRow}>
+              {todo.tags!.map((tag) => (
+                <View key={tag} style={styles.tag}>
+                  <Text style={styles.tagText}>#{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </TouchableOpacity>
 
         {hasSub && (
@@ -223,6 +232,23 @@ const createStyles = (colors: ThemeColors) =>
     reminderText: {
       fontSize: 12,
       color: colors.textSecondary,
+      fontWeight: "600",
+    },
+    tagRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+      marginTop: 6,
+    },
+    tag: {
+      backgroundColor: colors.accentSurface,
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+    },
+    tagText: {
+      fontSize: 12,
+      color: colors.accentSoft,
       fontWeight: "600",
     },
     expandBtn: {

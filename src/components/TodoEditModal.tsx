@@ -29,6 +29,7 @@ export interface TodoDraft {
   text: string;
   date: string;
   subtasks: SubTask[];
+  tags: string[];
   reminderTime: string | null; // "HH:MM" or null for no reminder
 }
 
@@ -58,6 +59,8 @@ export default function TodoEditModal({
   const [reminderOn, setReminderOn] = useState(false);
   const [reminderTime, setReminderTime] = useState(DEFAULT_REMINDER_TIME);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [tags, setTags] = useState<string[]>([]);
+  const [newTag, setNewTag] = useState("");
 
   // Reset fields whenever the modal opens for a (possibly different) todo.
   useEffect(() => {
@@ -69,8 +72,23 @@ export default function TodoEditModal({
       setReminderOn(Boolean(todo?.reminderTime));
       setReminderTime(todo?.reminderTime ?? DEFAULT_REMINDER_TIME);
       setShowTimePicker(false);
+      setTags(todo?.tags ? [...todo.tags] : []);
+      setNewTag("");
     }
   }, [visible, todo]);
+
+  const addTag = () => {
+    const t = newTag.trim();
+    if (!t) return;
+    // Case-insensitive de-dupe.
+    if (!tags.some((x) => x.toLowerCase() === t.toLowerCase())) {
+      setTags((prev) => [...prev, t]);
+    }
+    setNewTag("");
+  };
+
+  const removeTag = (tag: string) =>
+    setTags((prev) => prev.filter((t) => t !== tag));
 
   // Track keyboard visibility so an outside tap can dismiss it first.
   useEffect(() => {
@@ -99,6 +117,7 @@ export default function TodoEditModal({
       text: trimmed,
       date,
       subtasks: cleanedSubtasks,
+      tags,
       reminderTime: reminderOn ? reminderTime : null,
     });
   };
@@ -204,6 +223,39 @@ export default function TodoEditModal({
                 onChange={onPickerChange}
               />
             )}
+
+            <Text style={styles.label}>Tags</Text>
+            {tags.length > 0 && (
+              <View style={styles.tagsWrap}>
+                {tags.map((tag) => (
+                  <TouchableOpacity
+                    key={tag}
+                    style={styles.tagChip}
+                    onPress={() => removeTag(tag)}
+                    accessibilityLabel={`Remove tag ${tag}`}
+                  >
+                    <Text style={styles.tagChipText}>{tag}</Text>
+                    <Text style={styles.tagChipRemove}>✕</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            <View style={styles.tagInputRow}>
+              <TextInput
+                style={[styles.input, styles.tagInput]}
+                value={newTag}
+                onChangeText={setNewTag}
+                placeholder="Add a tag (e.g. workout)"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                returnKeyType="done"
+                onSubmitEditing={addTag}
+                blurOnSubmit={false}
+              />
+              <TouchableOpacity style={styles.tagAddBtn} onPress={addTag}>
+                <Text style={styles.tagAddText}>Add</Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.reminderHeader}>
               <Text style={[styles.label, styles.reminderLabel]}>
@@ -337,6 +389,51 @@ const createStyles = (colors: ThemeColors) =>
     backgroundColor: colors.surfaceAlt,
     minHeight: 48,
     textAlignVertical: "top",
+  },
+  tagsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 8,
+  },
+  tagChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.accentSurface,
+    borderRadius: 14,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  tagChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.accentSoft,
+  },
+  tagChipRemove: {
+    fontSize: 12,
+    color: colors.accentSoft,
+    fontWeight: "700",
+    marginLeft: 6,
+  },
+  tagInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  tagInput: {
+    flex: 1,
+    minHeight: 44,
+  },
+  tagAddBtn: {
+    marginLeft: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceAlt,
+  },
+  tagAddText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.accent,
   },
   reminderHeader: {
     flexDirection: "row",

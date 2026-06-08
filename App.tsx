@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  ScrollView,
   SectionList,
   type SectionListRenderItem,
   StatusBar,
@@ -85,6 +86,7 @@ function AppContent() {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [lang, setLang] = useState<string>(DEFAULT_SPEECH_LANG);
   const [filter, setFilter] = useState<DateFilter>("all");
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   // Always-current view of todos, so deleteTodo can read positions without
   // becoming dependent on (and re-created by) every todos change.
@@ -320,7 +322,7 @@ function AppContent() {
   }, []);
 
   const handleSaveModal = useCallback(
-    async ({ text, date, subtasks, reminderTime }: TodoDraft) => {
+    async ({ text, date, subtasks, tags, reminderTime }: TodoDraft) => {
       // With sub-tasks present, the parent's done state follows them.
       const derivedDone = (fallback: boolean) =>
         subtasks.length > 0 ? subtasks.every((s) => s.done) : fallback;
@@ -336,6 +338,7 @@ function AppContent() {
             text,
             date,
             subtasks,
+            tags,
             done: derivedDone(editingTodo.done),
             reminderTime: reminder,
           }
@@ -345,6 +348,7 @@ function AppContent() {
             date,
             done: derivedDone(false),
             subtasks,
+            tags,
             reminderTime: reminder,
           };
 
@@ -369,12 +373,36 @@ function AppContent() {
 
   const allDone = todos.length > 0 && remaining === 0;
 
+  // Distinct tags across all todos, alphabetically.
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    todos.forEach((t) => t.tags?.forEach((tag) => set.add(tag)));
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [todos]);
+
+  // Clear the tag filter if its tag no longer exists.
+  useEffect(() => {
+    if (selectedTag && !allTags.includes(selectedTag)) setSelectedTag(null);
+  }, [allTags, selectedTag]);
+
+  // Apply the tag filter before date grouping.
+  const tagFiltered = useMemo(
+    () =>
+      selectedTag
+        ? todos.filter((t) => t.tags?.includes(selectedTag))
+        : todos,
+    [todos, selectedTag]
+  );
+
   const today = todayISO();
   const sections = useMemo(
-    () => groupTodos(todos, filter, today),
-    [todos, filter, today]
+    () => groupTodos(tagFiltered, filter, today),
+    [tagFiltered, filter, today]
   );
-  const counts = useMemo(() => filterCounts(todos, today), [todos, today]);
+  const counts = useMemo(
+    () => filterCounts(tagFiltered, today),
+    [tagFiltered, today]
+  );
 
   const renderItem: SectionListRenderItem<Todo, TodoSection> = useCallback(
     ({ item }) => (
@@ -394,7 +422,7 @@ function AppContent() {
       style={[
         styles.container,
         {
-          paddingTop: insets.top,
+          paddingTop: insets.top + 8,
           paddingLeft: insets.left,
           paddingRight: insets.right,
         },
@@ -452,6 +480,48 @@ function AppContent() {
             </Text>
           </TouchableOpacity>
         </View>
+      )}
+
+      {allTags.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tagBarScroll}
+          contentContainerStyle={styles.tagBar}
+        >
+          <TouchableOpacity
+            style={[styles.tagFilter, selectedTag === null && styles.tagFilterActive]}
+            onPress={() => setSelectedTag(null)}
+          >
+            <Text
+              style={[
+                styles.tagFilterText,
+                selectedTag === null && styles.tagFilterTextActive,
+              ]}
+            >
+              All
+            </Text>
+          </TouchableOpacity>
+          {allTags.map((tag) => {
+            const active = selectedTag === tag;
+            return (
+              <TouchableOpacity
+                key={tag}
+                style={[styles.tagFilter, active && styles.tagFilterActive]}
+                onPress={() => setSelectedTag(active ? null : tag)}
+              >
+                <Text
+                  style={[
+                    styles.tagFilterText,
+                    active && styles.tagFilterTextActive,
+                  ]}
+                >
+                  #{tag}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       )}
 
       <SectionList
@@ -635,6 +705,36 @@ const createStyles = (colors: ThemeColors) =>
     paddingHorizontal: 20,
     paddingTop: 2,
     paddingBottom: 6,
+  },
+  tagBarScroll: {
+    flexGrow: 0,
+    height: 48,
+  },
+  tagBar: {
+    alignItems: "center",
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  tagFilter: {
+    height: 32,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  tagFilterActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  tagFilterText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.textPrimary,
+  },
+  tagFilterTextActive: {
+    color: colors.white,
   },
   actionBtn: {
     paddingVertical: 6,

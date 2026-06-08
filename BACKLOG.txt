@@ -54,6 +54,15 @@ PLANNED FEATURES
     edited, or deleted. See src/notifications.ts, TodoEditModal.tsx, App.tsx.
     NOTE: requires a native rebuild (expo-notifications is a native module).
 
+[FEATURE] (done) Tags + group/filter by tag
+    Each todo can have multiple tags (add/remove in the edit dialog "Tags"
+    section); tags show as #chips on the todo. A tag bar below Check all /
+    Delete all lists "All" + every tag in use; tapping one filters the list
+    to that tag (composes with the date filter & date grouping).
+    See TodoEditModal.tsx (editor), TodoItem.tsx (chips), App.tsx (tag bar
+    + filtering). Tags are added manually; voice-to-tags could be a follow-up.
+
+
 BUGS
 ----
 
