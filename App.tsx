@@ -130,8 +130,21 @@ function AppContent() {
       text: p.text,
       date: p.date,
       done: false,
+      reminderTime: p.reminderTime,
     }));
     setTodos((prev) => [...items, ...prev]);
+
+    // If the user spoke a time, schedule its reminder automatically.
+    items.forEach((t) => {
+      if (!t.reminderTime) return;
+      scheduleTodoReminder(t).then((nid) => {
+        if (nid) {
+          setTodos((prev) =>
+            prev.map((x) => (x.id === t.id ? { ...x, notificationId: nid } : x))
+          );
+        }
+      });
+    });
   }, []);
 
   const handleVoiceResult = useCallback(

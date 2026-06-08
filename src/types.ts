@@ -25,4 +25,6 @@ export interface Todo {
 export interface ParsedTodo {
   text: string;
   date: string;
+  // Optional spoken time ("HH:MM", 24h) → becomes the todo's reminder.
+  reminderTime?: string;
 }

@@ -32,6 +32,76 @@ export interface ExtractedDate {
   cleanedText: string;
 }
 
+// Result of natural-language time extraction.
+export interface ExtractedTime {
+  time: string | null; // "HH:MM" (24h)
+  cleanedText: string;
+}
+
+// Remove a matched substring (case-insensitive) and tidy whitespace.
+function stripMatch(original: string, matched: string): string {
+  const idx = original.toLowerCase().indexOf(matched.toLowerCase());
+  if (idx === -1) return original;
+  return (original.slice(0, idx) + original.slice(idx + matched.length))
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([.,!?])/g, "$1")
+    .trim();
+}
+
+// Best-effort spoken-time extraction, e.g. "at 9 am", "at 17:30", "9pm",
+// "at noon". Per-language prepositions ("at"/"u"/"um"/"alle"/"a las") are
+// accepted. Returns { time: "HH:MM" | null, cleanedText }.
+export function extractTime(text: string, lang: string = "en"): ExtractedTime {
+  const lower = text.toLowerCase();
+
+  const preps: Record<string, string> = {
+    en: "at",
+    hr: "u",
+    de: "um",
+    it: "alle(?: ore)?",
+    es: "a las|a la",
+  };
+  const prep = preps[lang] ?? preps.en;
+  const ampm = "(a\\.?m\\.?|p\\.?m\\.?)";
+
+  // "noon" / "midnight" (optionally preceded by the time preposition).
+  const noon = lower.match(
+    new RegExp(`\\b(?:${prep}\\s+)?(noon|podne|mittag|mezzogiorno|mediod[íi]a)\\b`)
+  );
+  if (noon) return { time: "12:00", cleanedText: stripMatch(text, noon[0]) };
+  const mid = lower.match(
+    new RegExp(
+      `\\b(?:${prep}\\s+)?(midnight|pono[ćc]|mitternacht|mezzanotte|medianoche)\\b`
+    )
+  );
+  if (mid) return { time: "00:00", cleanedText: stripMatch(text, mid[0]) };
+
+  // Try, in order: preposition + time, then "HH:MM", then "H am/pm".
+  const patterns = [
+    new RegExp(`\\b(?:${prep})\\s+(\\d{1,2})(?::(\\d{2}))?\\s*${ampm}?`, "i"),
+    new RegExp(`\\b(\\d{1,2}):(\\d{2})\\s*${ampm}?\\b`, "i"),
+    new RegExp(`\\b(\\d{1,2})\\s*${ampm}\\b`, "i"),
+  ];
+
+  for (const re of patterns) {
+    const m = lower.match(re);
+    if (!m) continue;
+    let hour = parseInt(m[1], 10);
+    const min = m[2] ? parseInt(m[2], 10) : 0;
+    const marker = (m[3] ?? "").replace(/\./g, "");
+    if (marker === "pm" && hour < 12) hour += 12;
+    if (marker === "am" && hour === 12) hour = 0;
+    if (hour > 23 || min > 59) continue;
+    const time = `${String(hour).padStart(2, "0")}:${String(min).padStart(
+      2,
+      "0"
+    )}`;
+    return { time, cleanedText: stripMatch(text, m[0]) };
+  }
+
+  return { time: null, cleanedText: text };
+}
+
 // Format a Date as a local "YYYY-MM-DD" string.
 export function toISODate(date: Date): string {
   const y = date.getFullYear();

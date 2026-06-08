@@ -210,6 +210,7 @@ export default function TodoEditModal({
                 Remind me on this day
               </Text>
               <Switch
+                style={styles.reminderSwitch}
                 value={reminderOn}
                 onValueChange={(v) => {
                   Keyboard.dismiss();
@@ -341,10 +342,15 @@ const createStyles = (colors: ThemeColors) =>
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: 18,
+    marginBottom: 4,
   },
   reminderLabel: {
-    marginTop: 14,
-    marginBottom: 8,
+    marginTop: 0,
+    marginBottom: 0,
+  },
+  reminderSwitch: {
+    transform: [{ scale: 0.85 }],
   },
   subRow: {
     flexDirection: "row",

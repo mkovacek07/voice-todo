@@ -8,7 +8,7 @@
 //   2. An on-device fallback that splits the sentence and extracts common dates.
 
 import { ANTHROPIC_API_KEY, ANTHROPIC_MODEL } from "./config";
-import { extractDate, todayISO } from "./dateUtils";
+import { extractDate, extractTime, todayISO } from "./dateUtils";
 import type { ParsedTodo } from "./types";
 
 // Shape of the bits of the Anthropic Messages API response we rely on.
@@ -42,8 +42,13 @@ export function parseLocally(transcript: string, lang: string = "en"): ParsedTod
   return splitPhrases(transcript)
     .map((phrase) => {
       const { iso, cleanedText } = extractDate(phrase, lang);
-      const text = tidyText(cleanedText);
-      return { text, date: iso || today };
+      const { time, cleanedText: noTime } = extractTime(cleanedText, lang);
+      const text = tidyText(noTime);
+      return {
+        text,
+        date: iso || today,
+        ...(time ? { reminderTime: time } : {}),
+      };
     })
     .filter((todo) => todo.text.length > 0);
 }
@@ -53,12 +58,16 @@ async function parseWithAI(transcript: string): Promise<ParsedTodo[]> {
   const today = todayISO();
   const system =
     "You convert a spoken sentence into a JSON array of todo items. " +
-    "Each item is an object with two fields: `text` (a short, cleaned-up task " +
-    "description) and `date` (an ISO date string YYYY-MM-DD). " +
+    "Each item is an object with fields: `text` (a short, cleaned-up task " +
+    "description), `date` (an ISO date string YYYY-MM-DD), and optionally " +
+    "`time` (a 24-hour clock string HH:MM) when the user mentions a time of " +
+    'day (e.g. "at 9 am" -> "09:00", "at 5pm" -> "17:00", "at noon" -> ' +
+    '"12:00"). Omit `time` if no time is mentioned. ' +
     `Today's date is ${today}. Resolve relative dates like "tomorrow", ` +
     '"next friday", or "in 3 days" against today. If an item has no date, use ' +
     `today (${today}). Split multiple tasks into separate items. ` +
-    "Keep each task's text in the same language the user spoke. " +
+    "Keep each task's text in the same language the user spoke (and do not " +
+    "include the date or time words in `text`). " +
     "Respond with ONLY the JSON array, no prose, no markdown fences.";
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -90,14 +99,21 @@ async function parseWithAI(transcript: string): Promise<ParsedTodo[]> {
 
   if (!Array.isArray(parsed)) throw new Error("Unexpected AI response shape");
 
-  return (parsed as { text?: unknown; date?: unknown }[])
-    .map((item) => ({
-      text: String(item.text ?? "").trim(),
-      date:
-        typeof item.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(item.date)
-          ? item.date
-          : today,
-    }))
+  return (parsed as { text?: unknown; date?: unknown; time?: unknown }[])
+    .map((item) => {
+      const validTime =
+        typeof item.time === "string" && /^\d{2}:\d{2}$/.test(item.time)
+          ? item.time
+          : undefined;
+      return {
+        text: String(item.text ?? "").trim(),
+        date:
+          typeof item.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(item.date)
+            ? item.date
+            : today,
+        ...(validTime ? { reminderTime: validTime } : {}),
+      };
+    })
     .filter((todo) => todo.text.length > 0);
 }
 
