@@ -23,7 +23,8 @@
       },
       "permissions": [
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "package": "com.dramko12.voicetodo"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -41,6 +42,11 @@
       ],
       "@react-native-community/datetimepicker",
       "expo-notifications"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2a6d344f-4474-46da-b91a-ac8ea92cca96"
+      }
+    }
   }
 }
